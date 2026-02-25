@@ -6,7 +6,7 @@ This is a python library for the simulation of Giant Atoms coupled to 1D structu
 
 Clone the library with 
 ```bash
-git clone https://github.com/WalterRieck/GiantAtoms
+git clone https://github.com/Q-WAVES/GiantAtoms
 ```
 
 # Functions

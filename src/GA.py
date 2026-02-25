@@ -1152,11 +1152,116 @@ class TGADoublon:
         return load(filename)
 
 
+#### noisy atoms, note: the compute dynamics uses   projections = np.dot(self.vs.conj().T, initialState); this is only valid for small Gamma, otherwise, use full biorthogonal
+
+class GA_noisy(GA):
+
+    def __init__(self, N, J, nAtoms, gs, deltas, couplePoints,
+                 Gamma_q=0.0, Gamma_c=0.0):
+        super().__init__(N, J, nAtoms, gs, deltas, couplePoints)
+        self.Gamma_q = Gamma_q
+        self.Gamma_c = Gamma_c
+
+    def ConstructHamiltonian(self):
+        super().ConstructHamiltonian()
+        H = self.Hamiltonian.astype(complex)
+
+        for i in range(self.nAtoms):
+            H[i, i] -= 1j * self.Gamma_q / 2
+
+        for i in range(self.nAtoms, self.nAtoms + self.N):
+            H[i, i] -= 1j * self.Gamma_c / 2
+
+        self.Hamiltonian = H
+
+    def computeEigens(self):
+        if self.Hamiltonian is None:
+            self.ConstructHamiltonian()
+        self.es, self.vs = np.linalg.eig(self.Hamiltonian)
+        self.vs_inv = np.linalg.inv(self.vs)
+        return self.es, self.vs
+
+    def computeDynamics(self, ts, initialState):
+
+        if self.es is None or self.vs is None:
+            self.computeEigens()
+
+        # biorthogonal projection
+        projections = self.vs_inv @ initialState
+    
+        phases = np.exp(-1j * np.outer(ts, self.es))
+
+        finalStates = (self.vs @ (phases * projections).T).T
+
+        print(np.linalg.norm(finalStates[-1]))
+
+        self.finalStates = finalStates
+
+        return self.finalStates
 
 
+class TGA_noisy(TGA):
 
+    def __init__(self, N, J, nAtoms, gs, deltas2, deltas1, couplePoints,
+                 Gamma_q=0.0, Gamma_c=0.0):
+        super().__init__(N, J, nAtoms, gs, deltas2, deltas1, couplePoints)
+        self.Gamma_q = Gamma_q
+        self.Gamma_c = Gamma_c
 
+    def ConstructHamiltonian(self):
+        super().ConstructHamiltonian()
+        H = self.Hamiltonian.astype(complex)
 
+        dim = len(H)
+
+        for idx in range(dim):
+            atoms, cavities = self.lookUpState(idx)
+
+            # Count cavity photons
+            n_cav_exc = len(cavities)
+
+            # Count qubit excitations
+            n_qubit_exc = 2-len(cavities)
+            
+            # Qubit decay:
+            # |2> level should decay at 2 Γ_q
+            # In 2-excitation sector:
+            # len(atoms)=2 → two qubit excitations
+            # len(atoms)=1 → one qubit excitation
+
+            decay_qubit = n_qubit_exc * self.Gamma_q
+
+            # Cavity decay
+            decay_cavity = n_cav_exc * self.Gamma_c
+
+            total_decay = decay_qubit + decay_cavity
+
+            H[idx, idx] -= 1j * total_decay / 2
+
+        self.Hamiltonian = H
+
+    def computeEigens(self):
+        if self.Hamiltonian is None:
+            self.ConstructHamiltonian()
+        self.es, self.vs = np.linalg.eig(self.Hamiltonian)
+        self.vs_inv = np.linalg.inv(self.vs)
+        return self.es, self.vs
+
+    def computeDynamics2_0(self, ts, initialState):
+
+        if self.es is None or self.vs is None:
+            self.computeEigens()
+
+        projections = self.vs_inv @ initialState
+
+        phases = np.exp(-1j * np.outer(ts, self.es))
+        finalStates = (self.vs @ (phases * projections).T).T
+
+        self.finalStates = finalStates
+        
+        print("TGA_noisy:",np.linalg.norm(finalStates[-1]))
+
+        return self.finalStates
 
 
 

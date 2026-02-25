@@ -1,9 +1,14 @@
+import sys
+import os
+
+sys.path.append(os.path.abspath("../../src"))
+
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.linalg as linalg
 from matplotlib.colors import Normalize
 from matplotlib.colors import PowerNorm
-from src.GA import *
+from GA import *
 import seaborn as sns
 import matplotlib as mpl
 

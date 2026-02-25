@@ -1,4 +1,9 @@
-from src.GA import *
+import sys
+import os
+
+sys.path.append(os.path.abspath("../../src"))
+
+from GA import *
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
