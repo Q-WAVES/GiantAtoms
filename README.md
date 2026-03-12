@@ -1,6 +1,6 @@
 # Summary 
 
-This is a python library for the simulation of Giant Atoms coupled to 1D structured environments.
+This is a python library for the simulation of multi-photon processes in waveguide QED.
 
 # Installation
 
