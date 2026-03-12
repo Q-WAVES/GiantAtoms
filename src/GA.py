@@ -501,6 +501,7 @@ class TGA:
         self.es = None
         self.vs = None
         self.finalStates = None
+        self.basis = self.build_basis()
 
     def ConstructHamiltonian(self):
         H = np.zeros((comb(self.N + self.nAtoms + 1, 2), comb(self.N + self.nAtoms + 1, 2)))
@@ -635,73 +636,60 @@ class TGA:
         return initState
 
     def computeDynamics2_0(self, ts, initialState):
+
         if self.es is None or self.vs is None:
             self.computeEigens()
-
-        ns2 = np.zeros((self.nAtoms, len(ts)))
-        ns1 = np.zeros((self.nAtoms, len(ts)))
-        EE = np.zeros(len(ts))
 
         phases = np.exp(-1j * np.outer(ts, self.es))
         projections = np.dot(self.vs.conj().T, initialState)
         finalStates = (self.vs @ (phases * projections).T).T
 
-        indexes = []
-        for i in range(self.nAtoms):
-            for j in range(self.nAtoms):
-                if i == j:
-                    continue
-                elif i < j:
-                    indexes.append(int(self.nAtoms + i * self.nAtoms - (i - 1) / 2 + j - 2 * i - 1))
-                else:
-                    indexes.append(int(self.nAtoms + j * self.nAtoms - (j - 1) / 2 + i - 2 * j - 1))
+        ns2 = np.zeros((self.nAtoms, len(ts)))  # |20>, |02>
+        ns1 = np.zeros((self.nAtoms, len(ts)))  # |10>, |01>
+        p11 = np.zeros(len(ts))
+        p00 = np.zeros(len(ts))
 
-            ns2[i] = np.abs(finalStates[:, i]) ** 2
-            ns1[i] = (np.sum(np.abs(finalStates[:, comb(self.nAtoms + 1, 2) + self.N * i:comb(self.nAtoms + 1, 2) + self.N * (i + 1)]) ** 2,axis=1)
-                    + np.sum(np.abs(finalStates[:, indexes]) ** 2, axis=1))
-        EE = np.abs(finalStates[:, 2]) ** 2
+        for ti in range(len(ts)):
+
+            psi = finalStates[ti]
+
+            for k in range(len(psi)):
+
+                atoms, cavities = self.lookUpState(k)
+                prob = np.abs(psi[k])**2
+                #print(atoms,cavities)
+
+                if len(atoms) == 2:
+                    # |11>
+                    p11[ti] += prob
+
+                elif len(atoms) == 1 and len(cavities) == 0:
+                    # |20> or |02>
+                    atom = atoms[0] - 1
+                    ns2[atom, ti] += prob
+
+                elif len(atoms) == 1 and len(cavities) == 1:
+                    # |10> or |01>
+                    atom = atoms[0] - 1
+                    ns1[atom, ti] += prob
+
+                elif len(atoms) == 0:
+                    # |00>
+                    p00[ti] += prob
+
+        # verify normalization
+        total = p11 + p00 + np.sum(ns1, axis=0) + np.sum(ns2, axis=0)
+
+        if not np.allclose(total, 1, atol=1e-10):
+            print("Warning: probability not conserved:", total)
 
         self.dynamicsl2 = ns2
         self.dynamicsl1 = ns1
-        self.dynamicsEE = EE
+        self.dynamicsEE = p11
+   # self.dynamics00 = p00
         self.finalStates = finalStates
-
-        return self.dynamicsl2, self.dynamicsl1, EE
-
-    def computeDynamics(self, ts, initialState):
-        if self.es is None or self.vs is None:
-            self.computeEigens()
-
-        ns2 = np.zeros((self.nAtoms, len(ts)))
-        ns1 = np.zeros((self.nAtoms, len(ts)))
-        EE = np.zeros(len(ts))
-        indexes = []
-        iter = 0
-        for t in ts:
-            finalState = np.zeros(len(self.Hamiltonian), dtype=complex)
-            for j in range(len(self.Hamiltonian)):
-                finalState += np.exp(-1j * self.es[j] * t) * self.vs[:, j] * np.dot(np.conjugate(self.vs[:, j]), initialState)
-            for i in range(self.nAtoms):
-                for j in range(self.nAtoms):
-                    if i == j:
-                        continue
-                    elif i < j:
-                        indexes.append(int(self.nAtoms + i * self.nAtoms - (i - 1) / 2 + j - 2 * i - 1))
-                    else:
-                        indexes.append(int(self.nAtoms + j * self.nAtoms - (j - 1) / 2 + i - 2 * j - 1))
-                EE[iter] = np.abs(finalState[2]) ** 2
-                ns2[i, iter] = np.abs(finalState[i]) ** 2
-                ns1[i, iter] = (np.sum(np.abs(finalState[(comb(self.nAtoms + 1, 2) + self.N* i):(comb(self.nAtoms + 1, 2) + self.N * (i + 1))]) ** 2)
-                              + np.sum(np.abs(finalState[indexes]) ** 2))
-
-            iter += 1
-            if iter % 100 == 0:
-                print(iter)
-
-        self.dynamicsl2 = ns2
-        self.dynamicsl1 = ns1
-        self.dynamicsEE = EE
-        return self.dynamicsl2, self.dynamicsl1, EE
+    
+        return ns2, ns1, p11
 
     def computeSiteDynamics(self, ts, initialState):
         if self.finalStates is None:
@@ -777,38 +765,34 @@ class TGA:
 
         self.IPR = IPR
         return IPR
+        
+    def build_basis(self):
 
-    def lookUpState(self, index):   # Index ---> atom and cavity numbers, index starts with 0, atoms/cavities with 1
-        atoms = []
-        cavities = []
-        tempIndex = 0
-        if index < self.nAtoms:
-            atoms.append(index + 1)
-            return atoms, cavities
-        elif index < self.nAtoms + comb(self.nAtoms, 2):
-            tempIndex = index - self.nAtoms
-            for i in range(self.nAtoms):
-                for j in range(i + 1, self.nAtoms):
-                    atomIndex = i * self.nAtoms - i * (i - 1) / 2 + j - 2 * i - 1
-                    if tempIndex == atomIndex:
-                        atoms.append(i + 1)
-                        atoms.append(j + 1)
-                        return atoms, cavities
-        elif index < self.nAtoms + comb(self.nAtoms + 1, 2) + self.N * self.nAtoms:
-            tempIndex = index - self.nAtoms - comb(self.nAtoms, 2)
-            q, mod = divmod(tempIndex, self.N)
-            atoms.append(q + 1)
-            cavities.append(mod + 1)
-            return atoms, cavities
-        else:
-            tempIndex = index - self.nAtoms - comb(self.nAtoms + 1, 2) - self.N * self.nAtoms
-            for i in range(self.N):
-                for j in range(i, self.N):
-                    cavityIndex = i * self.N - i * (i - 1) / 2 + j - i
-                    if tempIndex == cavityIndex:
-                        cavities.append(i + 1)
-                        cavities.append(j + 1)
-                        return atoms, cavities
+        basis = []
+
+        # --- Sector 1: two excitations on same atom ---
+        for a in range(1, self.nAtoms + 1):
+            basis.append(([a], []))     # |20>, |02>, ...
+
+        # --- Sector 2: one excitation on each atom ---
+        for i in range(1, self.nAtoms + 1):
+            for j in range(i + 1, self.nAtoms + 1):
+                basis.append(([i, j], []))   # |11>
+
+        # --- Sector 3: atom + photon ---
+        for a in range(1, self.nAtoms + 1):
+            for c in range(1, self.N + 1):
+                basis.append(([a], [c]))     # |10, c> or |01, c>
+
+        # --- Sector 4: two photons ---
+        for i in range(1, self.N + 1):
+            for j in range(i, self.N + 1):
+                basis.append(([], [i, j]))   # |00, i j>
+
+        return basis
+
+    def lookUpState(self, index):
+        return self.basis[index]
 
     def saveGA(self, filename):
         dump(self, filename)
