@@ -4,7 +4,7 @@ from joblib import dump, load
 
 
 class GA:
-    def __init__(self, N, J, nAtoms, gs, deltas, couplePoints):
+    def __init__(self, N, J, nAtoms, gs, deltas, couplePoints, couplingDisorder=0, frequencyDisorder=0):
         # gs, deltas and couplePoints are arrays with length nAtoms, the elements in couplePoints are arrays with a
         # number of couple-points, N is the number of cavities in the bath
 
@@ -14,6 +14,8 @@ class GA:
         self.deltas = deltas
         self.couplePoints = couplePoints
         self.J = J
+        self.couplingDisorder = couplingDisorder
+        self.frequencyDisorder = frequencyDisorder
         self.Hamiltonian = None
         self.es = None
         self.vs = None
@@ -21,6 +23,10 @@ class GA:
 
     def ConstructHamiltonian(self):
         H = np.zeros((self.nAtoms + self.N, self.nAtoms + self.N))
+        frequencyDeltas = np.random.uniform(-1, 1, self.N) * self.frequencyDisorder
+        couplingDeltas = np.random.uniform(-1, 1, self.N) * self.couplingDisorder
+        Js = couplingDeltas - self.J
+
         for i in range(self.nAtoms):
             delta = self.deltas[i]
             couplePointAtom = self.couplePoints[i]
@@ -32,11 +38,12 @@ class GA:
                 iter += 1
             H[i, i] = delta
 
-        for i in range(self.nAtoms, self.nAtoms + self.N):
-            for j in range(i, self.nAtoms + self.N):
-                if np.abs(i - j) == 1:
-                    H[i, j] = -self.J
-                    H[j, i] = -self.J
+        for i in range(self.N):
+            index = self.nAtoms + i
+            H[index, index] += frequencyDeltas[i]
+            if i != self.N - 1:
+                H[index, index + 1] = Js[i]
+                H[index + 1, index] = Js[i]
 
         self.Hamiltonian = H
 
@@ -132,7 +139,7 @@ class GA:
 
 
 class SA:
-    def __init__(self, N, J, nAtoms, gs, deltas, couplePoints):
+    def __init__(self, N, J, nAtoms, gs, deltas, couplePoints, couplingDisorder=0, frequencyDisorder=0):
         # gs, deltas and couplePoints are arrays with length nAtoms, N is the number of cavities in the bath
 
         self.N = N
@@ -141,12 +148,18 @@ class SA:
         self.deltas = deltas
         self.couplePoints = couplePoints
         self.J = J
+        self.couplingDisorder = couplingDisorder
+        self.frequencyDisorder = frequencyDisorder
         self.Hamiltonian = None
         self.es = None
         self.vs = None
 
     def ConstructHamiltonian(self):
         H = np.zeros((self.nAtoms + self.N, self.nAtoms + self.N))
+        frequencyDeltas = np.random.uniform(-1, 1, self.N) * self.frequencyDisorder
+        couplingDeltas = np.random.uniform(-1, 1, self.N) * self.couplingDisorder
+        Js = couplingDeltas - self.J
+
         for i in range(self.nAtoms):
             delta = self.deltas[i]
             couplePoint = self.couplePoints[i]
@@ -155,11 +168,12 @@ class SA:
             H[int(couplePoint) + self.nAtoms, i] = g
             H[i, i] = delta
 
-        for i in range(self.nAtoms, self.nAtoms + self.N):
-            for j in range(i, self.nAtoms + self.N):
-                if np.abs(i - j) == 1:
-                    H[i, j] = -self.J
-                    H[j, i] = -self.J
+        for i in range(self.N):
+            index = self.nAtoms + i
+            H[index, index] += frequencyDeltas[i]
+            if i != self.N - 1:
+                H[index, index + 1] = Js[i]
+                H[index + 1, index] = Js[i]
 
         self.Hamiltonian = H
 
@@ -239,7 +253,7 @@ class SA:
 
 
 class TSA:
-    def __init__(self, N, J, nAtoms, gs, deltas2, deltas1, couplePoints):
+    def __init__(self, N, J, nAtoms, gs, deltas2, deltas1, couplePoints, couplingDisorder=0, frequencyDisorder=0):
         self.N = N
         self.nAtoms = nAtoms
         self.gs = gs
@@ -247,12 +261,18 @@ class TSA:
         self.deltas1 = deltas1
         self.couplePoints = couplePoints
         self.J = J
+        self.couplingDisorder = couplingDisorder
+        self.frequencyDisorder = frequencyDisorder
         self.Hamiltonian = None
         self.es = None
         self.vs = None
 
     def ConstructHamiltonian(self):
         H = np.zeros((comb(self.N + self.nAtoms + 1, 2), comb(self.N + self.nAtoms + 1, 2)))
+        frequencyDeltas = np.random.uniform(-1, 1, self.N) * self.frequencyDisorder
+        couplingDeltas = np.random.uniform(-1, 1, self.N) * self.couplingDisorder
+        Js = couplingDeltas - self.J
+
         for i in range(self.nAtoms):
             for j in range(len(H)):
                 if j < self.nAtoms:
@@ -264,11 +284,11 @@ class TSA:
                     H[j, int(self.couplePoints[i]) + i * self.N + comb(self.nAtoms + 1, 2)] = self.gs[i]
                     H[int(self.couplePoints[i]) + i * self.N + comb(self.nAtoms + 1, 2), j] = self.gs[i]
                 elif j < comb(self.nAtoms + 1, 2) + self.nAtoms * self.N:
-                    H[j, j] = self.deltas1[i]
-                    if j != comb(self.nAtoms + 1, 2):
-                        H[j, j - 1] = -self.J
-                        H[j - 1, j] = -self.J
                     ii = j - comb(self.nAtoms + 1, 2) - i * self.N
+                    H[j, j] = self.deltas1[i] + frequencyDeltas[int(ii)]
+                    if int(ii) != 0:
+                        H[j, j - 1] = Js[int(ii) - 1]
+                        H[j - 1, j] = Js[int(ii) - 1]
                     jj1 = ii
                     kk1 = self.couplePoints[i] - 1
                     if int(jj1) <= int(kk1):
@@ -327,21 +347,26 @@ class TSA:
 
                     if int(jj1) <= int(kk1):
                         jk1 = jj1 * self.N - jj1*(jj1 - 1)/2 + kk1 - jj1
-                        H[j, int(jk1 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N)] = -self.J
-                        H[int(jk1 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N), j] = -self.J
+                        H[j, int(jk1 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N)] = Js[int(jj1)]
+                        H[int(jk1 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N), j] = Js[int(jj1)]
                     if int(jj2) <= int(kk2):
                         jk2 = jj2 * self.N - jj2*(jj2 - 1)/2 + kk2 - jj2
-                        H[j, int(jk2 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N)] = -self.J
-                        H[int(jk2 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N), j] = -self.J
+                        H[j, int(jk2 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N)] = Js[int(jj2)]
+                        H[int(jk2 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N), j] = Js[int(jj2)]
                     if s == "pass":
                         if int(jj3) <= int(kk3):
                             jk3 = jj3 * self.N - jj3 * (jj3 - 1) / 2 + kk3 - jj3
-                            H[j, int(jk3 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N)] = -self.J
-                            H[int(jk3 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N), j] = -self.J
+                            H[j, int(jk3 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N)] = Js[int(jj3)]
+                            H[int(jk3 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N), j] = Js[int(jj3)]
                         if int(jj4) <= int(kk4):
                             jk4 = jj4 * self.N - jj4 * (jj4 - 1) / 2 + kk4 - jj4
-                            H[j, int(jk4 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N)] = -self.J
-                            H[int(jk4 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N), j] = -self.J
+                            H[j, int(jk4 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N)] = Js[int(jj4)]
+                            H[int(jk4 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N), j] = Js[int(jj4)]
+
+        for i in range(self.N):
+            for j in range(i, self.N):
+                index = int(comb(self.nAtoms + 1, 2) + self.nAtoms * self.N + i * self.N - i * (i - 1) / 2 + j - i)
+                H[index, index] += frequencyDeltas[i] + frequencyDeltas[j]
 
         self.Hamiltonian = H
 
@@ -489,7 +514,7 @@ class TSA:
 
 
 class TGA:
-    def __init__(self, N, J, nAtoms, gs, deltas2, deltas1, couplePoints):
+    def __init__(self, N, J, nAtoms, gs, deltas2, deltas1, couplePoints, couplingDisorder=0, frequencyDisorder=0):
         self.N = N
         self.nAtoms = nAtoms
         self.gs = gs
@@ -497,6 +522,8 @@ class TGA:
         self.deltas1 = deltas1
         self.couplePoints = couplePoints
         self.J = J
+        self.couplingDisorder = couplingDisorder
+        self.frequencyDisorder = frequencyDisorder
         self.Hamiltonian = None
         self.es = None
         self.vs = None
@@ -505,6 +532,10 @@ class TGA:
 
     def ConstructHamiltonian(self):
         H = np.zeros((comb(self.N + self.nAtoms + 1, 2), comb(self.N + self.nAtoms + 1, 2)))
+        frequencyDeltas = np.random.uniform(-1, 1, self.N) * self.frequencyDisorder
+        couplingDeltas = np.random.uniform(-1, 1, self.N) * self.couplingDisorder
+        Js = couplingDeltas - self.J
+
         for i in range(comb(self.nAtoms + 1, 2)):
             if i < self.nAtoms:
                 couplePoints = self.couplePoints[i]
@@ -539,10 +570,10 @@ class TGA:
         for i in range(self.nAtoms):
             for j in range(self.N):
                 index = self.N * i + j + comb(self.nAtoms + 1, 2)
-                H[index, index] = self.deltas1[i]
+                H[index, index] = self.deltas1[i] + frequencyDeltas[j]
                 if j != self.N - 1:
-                    H[index, index + 1] = -self.J
-                    H[index + 1, index] = -self.J
+                    H[index, index + 1] = Js[j]
+                    H[index + 1, index] = Js[j]
                 couplePoints = self.couplePoints[i]
                 iter = 0
                 for couplePoint in couplePoints:
@@ -591,9 +622,9 @@ class TGA:
                 jj = int(self.N - 1)
                 kk = int(self.N - 1)
 
-            jjkks = [[int(jj + 1), kk], [jj, int(kk + 1)], [int(jj - 1), kk], [jj, int(kk - 1)]]
+            jjkks = [[int(jj + 1), kk, Js[jj]], [jj, int(kk + 1), Js[kk]], [int(jj - 1), kk, Js[jj-1]], [jj, int(kk - 1), Js[kk-1]]]
 
-            for [jj1, kk1] in jjkks:
+            for [jj1, kk1, Jhop] in jjkks:
                 if jj1 < 0  or jj1 > self.N - 1:
                     continue
                 elif kk1 < 0 or kk1 > self.N - 1:
@@ -603,12 +634,17 @@ class TGA:
                 else:
                     if jj1 == kk1 or jj == kk:
                         jk1 = jj1 * self.N - jj1 * (jj1 - 1) / 2 + kk1 - jj1
-                        H[index, int(jk1 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N)] = -np.sqrt(2) * self.J
-                        H[int(jk1 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N), index] = -np.sqrt(2) * self.J
+                        H[index, int(jk1 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N)] = np.sqrt(2) * Jhop
+                        H[int(jk1 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N), index] = np.sqrt(2) * Jhop
                     else:
                         jk1 = jj1 * self.N - jj1 * (jj1 - 1) / 2 + kk1 - jj1
-                        H[index, int(jk1 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N)] = -self.J
-                        H[int(jk1 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N), index] = -self.J
+                        H[index, int(jk1 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N)] = Jhop
+                        H[int(jk1 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N), index] = Jhop
+
+        for i in range(self.N):
+            for j in range(i, self.N):
+                index = int(comb(self.nAtoms + 1, 2) + self.nAtoms * self.N + i * self.N - i * (i - 1) / 2 + j - i)
+                H[index, index] += frequencyDeltas[i] + frequencyDeltas[j]
 
         self.Hamiltonian = H
 
@@ -803,7 +839,7 @@ class TGA:
 
 
 class TGADoublon:
-    def __init__(self, N, J, U, nAtoms, gDC, gs2, gs1, deltas2, deltas1, couplePoints, ):
+    def __init__(self, N, J, U, nAtoms, gDC, gs2, gs1, deltas2, deltas1, couplePoints, couplingDisorder=0, frequencyDisorder=0):
         self.dynamicsEE = None
         self.dynamicsl1 = None
         self.dynamicsl2 = None
@@ -817,6 +853,8 @@ class TGADoublon:
         self.deltas1 = deltas1
         self.couplePoints = couplePoints
         self.J = J
+        self.couplingDisorder = couplingDisorder
+        self.frequencyDisorder = frequencyDisorder
         self.resultG = None
         self.resultGG = None
         self.resultE = None
@@ -828,6 +866,10 @@ class TGADoublon:
 
     def ConstructHamiltonian(self):
         H = np.zeros((comb(self.N + self.nAtoms + 1, 2), comb(self.N + self.nAtoms + 1, 2)))
+        frequencyDeltas = np.random.uniform(-1, 1, self.N) * self.frequencyDisorder
+        couplingDeltas = np.random.uniform(-1, 1, self.N) * self.couplingDisorder
+        Js = couplingDeltas - self.J
+
         for i in range(comb(self.nAtoms + 1, 2)):
             if i < self.nAtoms:
                 couplePoints = self.couplePoints[i]
@@ -858,10 +900,10 @@ class TGADoublon:
         for i in range(self.nAtoms):
             for j in range(self.N):
                 index = self.N * i + j + comb(self.nAtoms + 1, 2)
-                H[index, index] = self.deltas1[i]
+                H[index, index] = self.deltas1[i] + frequencyDeltas[j]
                 if j != self.N - 1:
-                    H[index, index + 1] = -self.J
-                    H[index + 1, index] = -self.J
+                    H[index, index + 1] = Js[j]
+                    H[index + 1, index] = Js[j]
                 couplePoints = self.couplePoints[i]
                 iter = 0
                 for couplePoint in couplePoints:
@@ -883,8 +925,8 @@ class TGADoublon:
                         H[index, int(jk2 + comb(self.nAtoms + 1, 2) + self.N * self.nAtoms)] = 1 * self.gs1[i][iter]
                         H[int(jk2 + comb(self.nAtoms + 1, 2) + self.N * self.nAtoms), index] = 1 * self.gs1[i][iter]
                         if int(jj2) == int(kk2):
-                            H[i, int(jk1 + comb(self.nAtoms + 1, 2) + self.N * self.nAtoms)] = 1 * self.gDC[i][iter]
-                            H[int(jk1 + comb(self.nAtoms + 1, 2) + self.N * self.nAtoms), i] = 1 * self.gDC[i][iter]
+                            H[i, int(jk2 + comb(self.nAtoms + 1, 2) + self.N * self.nAtoms)] = 1 * self.gDC[i][iter]
+                            H[int(jk2 + comb(self.nAtoms + 1, 2) + self.N * self.nAtoms), i] = 1 * self.gDC[i][iter]
                             H[index, int(jk2 + comb(self.nAtoms + 1, 2) + self.N * self.nAtoms)] = np.sqrt(2) * self.gs1[i][iter]
                             H[int(jk2 + comb(self.nAtoms + 1, 2) + self.N * self.nAtoms), index] = np.sqrt(2) * self.gs1[i][iter]
                     iter += 1
@@ -901,10 +943,9 @@ class TGADoublon:
                     break
                 jj = int(self.N - 1)
                 kk = int(self.N - 1)
+            jjkks = [[int(jj + 1), kk, Js[jj]], [jj, int(kk + 1), Js[kk]], [int(jj - 1), kk, Js[jj-1]], [jj, int(kk - 1), Js[kk-1]]]
 
-            jjkks = [[int(jj + 1), kk], [jj, int(kk + 1)], [int(jj - 1), kk], [jj, int(kk - 1)]]
-
-            for [jj1, kk1] in jjkks:
+            for [jj1, kk1, Jhop] in jjkks:
                 if jj1 < 0 or jj1 > self.N - 1:
                     continue
                 elif kk1 < 0 or kk1 > self.N - 1:
@@ -914,14 +955,19 @@ class TGADoublon:
                 else:
                     if jj1 == kk1 or jj == kk:
                         jk1 = jj1 * self.N - jj1 * (jj1 - 1) / 2 + kk1 - jj1
-                        H[index, int(jk1 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N)] = -np.sqrt(2) * self.J
-                        H[int(jk1 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N), index] = -np.sqrt(2) * self.J
+                        H[index, int(jk1 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N)] = np.sqrt(2) * Jhop
+                        H[int(jk1 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N), index] = np.sqrt(2) * Jhop
                         if jj1 == kk1:
                             H[int(jk1 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N), int(jk1 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N)] = self.U
                     else:
                         jk1 = jj1 * self.N - jj1 * (jj1 - 1) / 2 + kk1 - jj1
-                        H[index, int(jk1 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N)] = -self.J
-                        H[int(jk1 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N), index] = -self.J
+                        H[index, int(jk1 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N)] = Jhop
+                        H[int(jk1 + comb(self.nAtoms + 1, 2) + self.nAtoms * self.N), index] = Jhop
+
+        for i in range(self.N):
+            for j in range(i, self.N):
+                index = int(comb(self.nAtoms + 1, 2) + self.nAtoms * self.N + i * self.N - i * (i - 1) / 2 + j - i)
+                H[index, index] += frequencyDeltas[i] + frequencyDeltas[j]
 
         self.Hamiltonian = H
 
@@ -1141,8 +1187,9 @@ class TGADoublon:
 class GA_noisy(GA):
 
     def __init__(self, N, J, nAtoms, gs, deltas, couplePoints,
-                 Gamma_q=0.0, Gamma_c=0.0):
-        super().__init__(N, J, nAtoms, gs, deltas, couplePoints)
+                 Gamma_q=0.0, Gamma_c=0.0, couplingDisorder=0, frequencyDisorder=0):
+        super().__init__(N, J, nAtoms, gs, deltas, couplePoints,
+                         couplingDisorder=couplingDisorder, frequencyDisorder=frequencyDisorder)
         self.Gamma_q = Gamma_q
         self.Gamma_c = Gamma_c
 
@@ -1187,8 +1234,9 @@ class GA_noisy(GA):
 class TGA_noisy(TGA):
 
     def __init__(self, N, J, nAtoms, gs, deltas2, deltas1, couplePoints,
-                 Gamma_q=0.0, Gamma_c=0.0):
-        super().__init__(N, J, nAtoms, gs, deltas2, deltas1, couplePoints)
+                 Gamma_q=0.0, Gamma_c=0.0, couplingDisorder=0, frequencyDisorder=0):
+        super().__init__(N, J, nAtoms, gs, deltas2, deltas1, couplePoints,
+                         couplingDisorder=couplingDisorder, frequencyDisorder=frequencyDisorder)
         self.Gamma_q = Gamma_q
         self.Gamma_c = Gamma_c
 
@@ -1246,6 +1294,3 @@ class TGA_noisy(TGA):
         print("TGA_noisy:",np.linalg.norm(finalStates[-1]))
 
         return self.finalStates
-
-
-

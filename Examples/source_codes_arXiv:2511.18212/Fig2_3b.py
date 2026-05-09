@@ -2,7 +2,7 @@ import sys, os
 
 sys.path.append(os.path.abspath("../../src"))
 
-from GA import *
+from src.GA import *
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
@@ -22,8 +22,8 @@ mpl.rcParams.update({
 
 # Fig 2b DC = True, 3b DC = False
 
-#DC = False
-DC = True
+DC = False
+#DC = True
 maxT, nT = 100, 1000
 ts = np.linspace(0, maxT, nT)
 
@@ -56,7 +56,7 @@ if DC:
     plt.ylim(0.49, 1.01)
     plt.ylabel(r'$n^{(1)}(t)$')
     plt.tight_layout()
-    #plt.savefig('Figures/PaperFigures/1GACompDC.svg')
+    plt.savefig('../../Figures/PaperFigures/DC1GAComp.svg')
     plt.show()
 else:
     deltas2 = [[5.0], [5.2], [7.0]]
@@ -87,7 +87,7 @@ else:
     plt.ylabel(r'$n^{(2)}(t)$')
     plt.title(r'$\Delta_1 /J=  %.3f$' % (giantAtom.deltas1[0]))
     plt.tight_layout()
-    #plt.savefig('Figures/PaperFigures/1GACompg0_25noDC.svg')
+    plt.savefig('../../Figures/PaperFigures/noDC1GAComp.svg')
     plt.show()
 
 

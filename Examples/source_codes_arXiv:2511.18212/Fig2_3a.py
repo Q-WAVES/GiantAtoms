@@ -4,7 +4,7 @@ from src.GA import TGADoublon
 
 sys.path.append(os.path.abspath("../../src"))
 
-from GA import *
+from src.GA import *
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -24,13 +24,17 @@ mpl.rcParams.update({
     '''
 })
 
+np.random.seed(12345)
+
 # Fig 2a inset:       BS = "2D", delta1 = [0], delta2 = [10.392], gs = [[0, 0], [0, 0]], gsDC = [[0.04, 0.04], [0.04, 0.04]]
 # Fig 2a main figure: BS = "1D", delta1 = [0], delta2 = [10.392], gs = [[0, 0], [0, 0]], gsDC = [[0.04, 0.04], [0.04, 0.04]]
 
 # Fig 3a inset:       BS = "2D", delta1 = [5.337], delta2 = [5.0], gs = [[0.25, 0.25], [0.25, 0.25]], gsDC = [[0, 0], [0, 0]]
 # Fig 3a main figure: BS = "1D", delta1 = [5.337], delta2 = [5.0], gs = [[0.25, 0.25], [0.25, 0.25]], gsDC = [[0, 0], [0, 0]]
 
-BS = '1D'
+BS1D = True
+BS2D = True
+
 
 def DFIfreq(k, U, J):
     return np.sqrt(U ** 2 + 16 * J ** 2 * np.cos(k / 2) ** 2)
@@ -41,22 +45,25 @@ N = 199
 dx = 2
 couplePoints = [[int((N + 1 + dx) / 2), int((N + 1 - dx) / 2)]]
 delta1 = [5.337]
-delta2 = [5.0]
+delta2 = [5]
 gs = [[0.25, 0.25], [0.25, 0.25]]
 gsDC = [[0.0, 0.0], [0.0, 0.0]]
 J = 1
 U = 10
 
-giantAtom = TGADoublon(N, J, U, nAtoms, gsDC, gs, gs, delta2, delta1, couplePoints)
-#giantAtom = TGADoublon.loadGA('SavedGAs/1TGADoublondx2N199g025Delta1_5_337Delta2_5.joblib')
+giantAtom = TGADoublon(N, J, U, nAtoms, gsDC, gs, gs, delta2, delta1, couplePoints, frequencyDisorder=0, detuningDisorder=0)
 
+giantAtom.ConstructHamiltonian()
+H = giantAtom.Hamiltonian
 es, vs = giantAtom.computeEigens()
 IPR = giantAtom.computeIPR()
+
 indeces = np.linspace(0, len(giantAtom.Hamiltonian) - 1, len(giantAtom.Hamiltonian))
 
 maxIndex = np.argmax(IPR)
 
-DBStates = []
+DBStates1D = []
+DBStates2D = []
 eigenEnergies = []
 
 for i in range(0):
@@ -67,8 +74,7 @@ for i in range(0):
     maxIndex = np.argmax(IPR)
 
 
-if BS == '2D':
-    plt.rcParams['font.size'] = 40
+if BS2D:
     for i in range(1):
         doublonState = np.zeros((giantAtom.N, giantAtom.N))
 
@@ -82,18 +88,10 @@ if BS == '2D':
                 doublonState[j, k] = np.abs(twoPhotonEigenState[int(index)]) ** 2
                 doublonState[k, j] = np.abs(twoPhotonEigenState[int(index)]) ** 2
 
-        DBStates.append(doublonState)
+        DBStates2D.append(doublonState)
         eigenEnergies.append(eigenEnergy)
 
-        IPR = np.delete(IPR, maxIndex)
-
-        vs = np.delete(vs, maxIndex, axis=1)
-        es = np.delete(es, maxIndex)
-        maxIndex = np.argmax(IPR)
-
-elif BS == '1D':
-    plt.rcParams['figure.figsize'] = [7, 6]
-    plt.rcParams['font.size'] = 28
+if BS1D:
     for i in range(1):
         doublonState = np.zeros(giantAtom.N)
 
@@ -105,47 +103,47 @@ elif BS == '1D':
             index = j * giantAtom.N - j * (j - 1) / 2
             doublonState[j] = np.abs(twoPhotonEigenState[int(index)]) ** 2
 
-        DBStates.append(doublonState)
+        DBStates1D.append(doublonState)
         eigenEnergies.append(eigenEnergy)
-
-        IPR = np.delete(IPR, maxIndex)
-
-        vs = np.delete(vs, maxIndex, axis=1)
-        es = np.delete(es, maxIndex)
-        maxIndex = np.argmax(IPR)
 
 iter = 0
 
-if DBStates[0].ndim == 1:
-    for DBState in DBStates:
+if DBStates1D[0].ndim == 1:
+    plt.rcParams['figure.figsize'] = [7, 6]
+    plt.rcParams['font.size'] = 28
+    for DBState in DBStates1D:
         eigenEnergy = eigenEnergies[iter]
 
         plt.plot(DBState, linewidth=4)
         plt.xlabel(r'Cavity index $(i)$')
         plt.xticks(np.linspace(0, giantAtom.N - 1, 5, dtype=int), np.linspace(1, giantAtom.N, 5, dtype=int))
-        # plt.ylim([0 - 0.00005, 0.0008 + 0.00005])
+        #plt.ylim([-0.001, 0.019])
         #plt.yticks(np.linspace(0, 0.0006, 5))
         plt.ylabel(r'$P_b(n, n)$')
         plt.xlabel(r'Cavity index ($n$)')
         plt.title(r'$E/J = %.3f$' % eigenEnergy)
         plt.tight_layout()
+        #plt.savefig('../../Figures/PaperFigures/noDCFig_a1.svg')
         plt.show()
         iter += 1
-elif DBStates[0].ndim == 2:
-    for DBState in DBStates:
+if DBStates2D[0].ndim == 2:
+    plt.rcParams['figure.figsize'] = [7, 7]
+    plt.rcParams['font.size'] = 40
+    for DBState in DBStates2D:
 
         fig, ax = plt.subplots()
 
         eigenEnergy = eigenEnergies[iter]
-        cax = ax.imshow(DBState[89:110, 89:110], cmap = 'hot', vmin = 0, vmax = 0.025)
+        cax = ax.imshow(DBState[89:110, 89:110], cmap = 'hot', vmin = 0, vmax = 0.07)
         ax.invert_yaxis()
         ax.set(xticks=np.linspace(0, 20, 2, dtype=int), yticks=np.linspace(0, 20, 2, dtype=int),
                xticklabels=np.linspace(90, 110, 2, dtype=int), yticklabels=np.linspace(90, 110, 2, dtype=int))
         ax.set_ylabel(r'$n$')
         ax.set_xlabel(r'$m$')
-        cbar = fig.colorbar(cax, ax=ax, orientation='horizontal', location='top', ticks=np.linspace(0, 0.025, 2))
+        cbar = fig.colorbar(cax, ax=ax, orientation='horizontal', location='top', ticks=np.linspace(0, 0.07, 2))
         cbar.set_label(r'$P_b(m, n)$', labelpad=10)
         fig.tight_layout()
+        #fig.savefig('../../Figures/PaperFigures/noDCFig_a2.svg')
         fig.show()
         iter += 1
 
