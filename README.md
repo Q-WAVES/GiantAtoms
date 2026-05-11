@@ -27,7 +27,7 @@ GA(N, J, nAtoms, gs, deltas, couplePoints)
 SA(N, J, nAtoms, gs, deltas, couplePoints)
 ```
 Create a giant or small atom coupled to a structured waveguide by specifying the size of the waveguide (N), the coupling between neighboring cavities (J), number of atoms (nAtoms), coupling strengths of the atom to the waveguide for each atom and couple point (gs), detuning of the atoms (deltas) and coupling point indices of each atom and coupling point (couplePoints). N and nAtoms are integers, J is a float, deltas is a 1D list [delta1, ...,  deltan] and couplePoints and gs are 2D lists [[g11, ..., g1n], ... , [gn1, gnn]]. 
-Optionally, pass `frequencyDisorder=x` to add waveguide hopping disorder and `detuningDisorder=x` to add waveguide site detuning disorder, using the same site-based disorder convention as `TGADoublon`. If omitted, the Hamiltonian is unchanged.
+Optionally, pass `frequencyDisorder=x` to add waveguide site disorder and `couplingDisorder=x` to add waveguide hopping disorder. If omitted, the Hamiltonian is unchanged.
 
 ## TGA / TSA
 Two photon giant atom and small atom creation.
@@ -36,7 +36,7 @@ TGA(N, J, nAtoms, gs, deltas2, deltas1, couplePoints)
 TSA(N, J, nAtoms, gs, deltas2, deltas1, couplePoints)
 ```
 Create a three level giant or small atom coupled to a structured waveguide by specifying the size of the waveguide (N), the coupling between neighboring cavities (J), number of atoms (nAtoms), coupling strengths of the atom to the waveguide for each atom and couple point (gs), detuning of the second level of the atoms (deltas2), detuning of the first level of the atoms (deltas1) and coupling point indices of each atom and coupling point (couplePoints). N and nAtoms are integers, J is a float, deltas1 and deltas2 are 1D lists [delta21, ...,  delta2n], [delta11, ..., delta1n] and couplePoints and gs are 2D lists [[g11, ..., g1n], ... , [gn1, gnn]]. 
-Optionally, pass `frequencyDisorder=x` to add waveguide hopping disorder and `detuningDisorder=x` to add waveguide site detuning disorder, using the same site-based disorder convention as `TGADoublon`. If omitted, the Hamiltonian is unchanged.
+Optionally, pass `frequencyDisorder=x` to add waveguide site disorder and `couplingDisorder=x` to add waveguide hopping disorder. If omitted, the Hamiltonian is unchanged.
 
 ## TGADoublon
 Two photon giant atom with added kerr potential to two-photon cavities.
@@ -45,7 +45,7 @@ TGADoublon(N, J, U, nAtoms, gDC, gs2, gs1, deltas2, deltas1, couplePoints)
 ```
 Create a three level giant atom with an added kerr potential coupled to a structured waveguide by specifying the size of the waveguide (N), the coupling between neighboring cavities (J), kerr potential (U),  number of atoms (nAtoms), direct coupling strengths of the second level of the atom to the waveguide for each atom and couple point (gsDC), coupling strength between level 2 and level 1 of the atom (gs2), coupling strengths between the first level of the atom and the waveguide (gs1), detuning of the second level of the atoms (deltas2), the detuning of the first level of the atoms (deltas1) and the coupling point indices of each atom and coupling point (couplePoints). N and nAtoms are integers, J is a float, deltas1 and deltas2 are 1D lists [delta21, ...,  delta2n], [delta11, ..., delta1n] and couplePoints, gsDC, gs2, gs1  are 2D lists [[g11, ..., g1n], ... , [gn1, gnn]]. 
 Here usually gs1 = gs2.
-Optionally, pass `frequencyDisorder=x` to add waveguide hopping disorder and `detuningDisorder=x` to add waveguide site detuning disorder. The same site disorder is used in the atom-photon and two-photon sectors. If omitted, the Hamiltonian is unchanged.
+Optionally, pass `frequencyDisorder=x` to add waveguide site disorder and `couplingDisorder=x` to add waveguide hopping disorder. If omitted, the Hamiltonian is unchanged.
 
 # Methods
 
